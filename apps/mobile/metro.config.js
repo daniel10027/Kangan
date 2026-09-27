@@ -8,7 +8,10 @@ const workspaceRoot = path.resolve(projectRoot, "../..");
 const config = getDefaultConfig(projectRoot);
 
 // Monorepo : autorise Metro à résoudre les packages partagés (@kangan/*).
-config.watchFolders = [workspaceRoot];
+// On ne surveille QUE node_modules et packages/ à la racine — jamais tout
+// workspaceRoot, qui inclurait apps/web (node_modules, .next, etc.) et fait
+// exploser le nombre de descripteurs de fichiers ouverts (EMFILE) sans watchman.
+config.watchFolders = [path.resolve(workspaceRoot, "node_modules"), path.resolve(workspaceRoot, "packages")];
 config.resolver.nodeModulesPaths = [path.resolve(projectRoot, "node_modules"), path.resolve(workspaceRoot, "node_modules")];
 config.resolver.disableHierarchicalLookup = false;
 

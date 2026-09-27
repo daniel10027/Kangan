@@ -21,6 +21,12 @@
 # variables partageaient le même nom, la valeur "127.0.0.1" définie dans
 # .env pour les scripts locaux (seed:demo, npm run dev:web) écraserait le
 # défaut Docker et casserait la connexion au conteneur.
+#
+# Fonctionne sans aucun fichier .env : les clés anon/service_role par défaut
+# ci-dessous sont les clés de démonstration fixes que `supabase start`
+# génère systématiquement en local (JWT_SECRET par défaut de la CLI). Un
+# .env à la racine (mêmes noms de variables) les surcharge si besoin —
+# obligatoire pour pointer vers un projet Supabase hébergé.
 # ---------------------------------------------------------------------------
 
 services:
@@ -30,7 +36,7 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         NEXT_PUBLIC_SUPABASE_URL: ${DOCKER_SUPABASE_URL:-http://host.docker.internal:54321}
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0}
         NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
         NEXT_PUBLIC_PAYMENT_MODE: ${PAYMENT_MODE:-simulator}
     ports:
@@ -38,7 +44,7 @@ services:
     environment:
       NEXT_PUBLIC_SUPABASE_URL: ${DOCKER_SUPABASE_URL:-http://host.docker.internal:54321}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
-      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU}
       PAYMENT_MODE: ${PAYMENT_MODE:-simulator}
       NEXT_PUBLIC_PAYMENT_MODE: ${PAYMENT_MODE:-simulator}
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
@@ -64,7 +70,7 @@ services:
       - "19006:19006"
     environment:
       EXPO_PUBLIC_SUPABASE_URL: ${DOCKER_SUPABASE_URL:-http://host.docker.internal:54321}
-      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0}
       EXPO_PUBLIC_API_URL: http://host.docker.internal:3000/api/v1
       CI: "1"
     extra_hosts:

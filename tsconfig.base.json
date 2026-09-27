@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "declaration": false,
+    "baseUrl": ".",
+    "paths": {
+      "@kangan/shared": ["packages/shared/src/index.ts"],
+      "@kangan/shared/*": ["packages/shared/src/*"],
+      "@kangan/ui": ["packages/ui/src/index.ts"],
+      "@kangan/ui/*": ["packages/ui/src/*"],
+      "@kangan/payments": ["packages/payments/src/index.ts"],
+      "@kangan/payments/*": ["packages/payments/src/*"]
+    }
+  }
+}

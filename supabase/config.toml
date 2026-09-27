@@ -1,0 +1,59 @@
+# Configuration Supabase CLI locale — `supabase start` applique
+# automatiquement supabase/migrations/*.sql puis supabase/seed.sql.
+# Voir docs/DEPLOYMENT.md pour la procédure complète.
+
+project_id = "kangan-finance"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000"]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.sms]
+enable_signup = true
+enable_confirmations = false
+# GoTrue exige un fournisseur déclaré pour activer l'auth par téléphone,
+# même en local. Les identifiants ci-dessous sont des valeurs factices :
+# tout numéro listé dans [auth.sms.test_otp] reçoit son code fixe sans
+# jamais appeler Twilio. En production, remplacer par de vrais identifiants
+# (ou un fournisseur SMS ivoirien) et supprimer test_otp.
+[auth.sms.twilio]
+enabled = true
+account_sid = "AC_test_local_dev_only"
+auth_token = "test_local_dev_only"
+message_service_sid = "test_local_dev_only"
+
+[auth.sms.test_otp]
+2250700000001 = "123456"
+2250700000002 = "123456"
+2250700000003 = "123456"
+2250700000010 = "123456"
+2250700000011 = "123456"
+2250700000099 = "123456"
+
+[storage]
+enabled = true
+file_size_limit = "10MiB"
+
+[realtime]
+enabled = true
+
+[edge_runtime]
+enabled = true

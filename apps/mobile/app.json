@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "Kangan Finance",
+    "slug": "kangan-finance",
+    "scheme": "kanganfinance",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0F3D2E"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "ci.kangan.finance",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Kangan utilise Face ID pour sécuriser l'ouverture de l'application."
+      }
+    },
+    "android": {
+      "package": "ci.kangan.finance",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0F3D2E"
+      },
+      "permissions": ["USE_BIOMETRIC", "USE_FINGERPRINT"]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Kangan utilise Face ID pour sécuriser l'ouverture de l'application."
+        }
+      ]
+    ],
+    "extra": {
+      "router": { "origin": false },
+      "eas": { "projectId": "REPLACE_WITH_EAS_PROJECT_ID" }
+    }
+  }
+}

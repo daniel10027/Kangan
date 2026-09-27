@@ -1,0 +1,64 @@
+# ---------------------------------------------------------------------------
+# Kangan Finance — lancer toute la plateforme d'un coup en local.
+#
+# Étape préalable (une fois) : le backend (Postgres, Auth, Storage, Studio)
+# est géré par la CLI Supabase, elle-même basée sur Docker Compose :
+#
+#   npx supabase start          # démarre Postgres/Auth/Storage/Studio
+#   npm run seed:demo           # crée les comptes et caisses de démonstration
+#
+# Puis, à la racine du dépôt :
+#
+#   docker compose up --build   # démarre le web (Next.js) + le bundler mobile (Expo)
+#
+# Le web est servi sur http://localhost:3000, Supabase Studio sur
+# http://localhost:54323, l'API Supabase sur http://localhost:54321.
+# ---------------------------------------------------------------------------
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-http://host.docker.internal:54321}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+        NEXT_PUBLIC_PAYMENT_MODE: ${PAYMENT_MODE:-simulator}
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-http://host.docker.internal:54321}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+      PAYMENT_MODE: ${PAYMENT_MODE:-simulator}
+      NEXT_PUBLIC_PAYMENT_MODE: ${PAYMENT_MODE:-simulator}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      JWT_AUDIT_SALT: ${JWT_AUDIT_SALT:-dev-secret}
+      MOOV_MONEY_BASE_URL: ${MOOV_MONEY_BASE_URL:-}
+      MOOV_MONEY_MERCHANT_ID: ${MOOV_MONEY_MERCHANT_ID:-}
+      MOOV_MONEY_API_KEY: ${MOOV_MONEY_API_KEY:-}
+      MOOV_MONEY_WEBHOOK_SECRET: ${MOOV_MONEY_WEBHOOK_SECRET:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  mobile:
+    image: node:20-slim
+    working_dir: /repo
+    command: >
+      sh -c "npm ci --workspace=@kangan/mobile && npx expo start --web --port 19006"
+    volumes:
+      - .:/repo
+    ports:
+      - "19000:19000"
+      - "19001:19001"
+      - "19002:19002"
+      - "19006:19006"
+    environment:
+      EXPO_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-http://host.docker.internal:54321}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+      EXPO_PUBLIC_API_URL: ${NEXT_PUBLIC_APP_URL:-http://host.docker.internal:3000}/api/v1
+      CI: "1"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    profiles: ["mobile"]

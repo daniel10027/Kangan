@@ -1,0 +1,397 @@
+openapi: 3.1.0
+info:
+  title: Kangan Finance API
+  version: "1.0.0"
+  description: >
+    API REST de Kangan Finance — la caisse scolaire digitale (cahier des
+    charges v1.0, section 14). Toutes les routes sont préfixées par
+    /api/v1. Réponses en JSON ; erreurs au format { code, message, details }.
+    Tous les montants sont des entiers en F CFA. Toutes les dates sont en
+    ISO 8601, fuseau Africa/Abidjan (UTC+0).
+  contact:
+    name: Kangan Finance
+    email: contact@kangan-finance.ci
+servers:
+  - url: https://kangan-finance.vercel.app/api/v1
+    description: Production
+  - url: http://localhost:3000/api/v1
+    description: Local
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        Jeton de session Supabase. Le web l'envoie via cookie de session ;
+        le mobile via l'en-tête Authorization: Bearer <access_token>.
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        code: { type: string, example: VALIDATION_ERROR }
+        message: { type: string }
+        details: { type: ["object", "null"] }
+
+    School:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        slug: { type: string }
+        type: { type: string, enum: [prive, public, confessionnel] }
+        cycles:
+          type: array
+          items: { type: string, enum: [maternelle, primaire, secondaire, superieur, formation_professionnelle] }
+        commune: { type: string }
+        city: { type: string }
+        status: { type: string, enum: [en_attente_kyb, actif, suspendu] }
+
+    FeeSchedule:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        level: { type: string, example: "CM2" }
+        registration_fee: { type: integer, example: 60000 }
+        tuition_fee: { type: integer, example: 240000 }
+        deposit_percent: { type: number, example: 20 }
+        min_payment: { type: integer, example: 500 }
+        deadline: { type: string, format: date }
+
+    SavingsBox:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        reference: { type: string, example: "KG-2026-000123" }
+        status:
+          type: string
+          enum: [brouillon, en_attente, active, completee, reversee, suspendue, remboursee]
+        goal_type: { type: string, enum: [inscription, inscription_partielle, totalite] }
+        target_amount: { type: integer }
+        deposit_amount: { type: integer }
+        deadline: { type: string, format: date }
+        plan_frequency: { type: string, enum: [jour, semaine, mois] }
+        suggested_payment: { type: integer }
+
+    Transaction:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        box_id: { type: string, format: uuid }
+        type: { type: string, enum: [deposit, payment, contribution, payout, refund, reversal] }
+        amount: { type: integer }
+        operator: { type: string, enum: [moov_money, mtn_money, orange_money, wave, card] }
+        status: { type: string, enum: [initiee, reussie, echouee, annulee] }
+        created_at: { type: string, format: date-time }
+
+  parameters:
+    idParam:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+paths:
+  /auth/otp:
+    post:
+      summary: Envoie un code OTP au numéro
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone]
+              properties:
+                phone: { type: string, example: "+2250700000001" }
+      responses:
+        "200": { description: OTP envoyé }
+        "429": { description: Trop de demandes (5/heure/numéro) }
+
+  /auth/verify:
+    post:
+      summary: Vérifie l'OTP et ouvre la session
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, code]
+              properties:
+                phone: { type: string }
+                code: { type: string, minLength: 6, maxLength: 6 }
+      responses:
+        "200":
+          description: Session ouverte
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token: { type: string }
+                  refresh_token: { type: string }
+                  role: { type: string }
+                  profile_complete: { type: boolean }
+        "403": { description: Code invalide ou expiré }
+
+  /schools:
+    get:
+      summary: Liste et recherche des écoles (commune, cycle, texte)
+      security: []
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: commune
+          in: query
+          schema: { type: string }
+        - name: cycle
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Liste des écoles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/School" }
+
+  /schools/{slug}:
+    get:
+      summary: Fiche école et grilles tarifaires publiées
+      security: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Détail école
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  school: { $ref: "#/components/schemas/School" }
+                  fee_schedules:
+                    type: array
+                    items: { $ref: "#/components/schemas/FeeSchedule" }
+        "404": { description: École introuvable }
+
+  /students:
+    post:
+      summary: Crée un bénéficiaire (enfant)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [first_name, last_name]
+              properties:
+                first_name: { type: string }
+                last_name: { type: string }
+      responses:
+        "201": { description: Bénéficiaire créé }
+    get:
+      summary: Liste des enfants du parent connecté
+      responses:
+        "200": { description: Liste }
+
+  /boxes:
+    post:
+      summary: Crée une caisse en brouillon et calcule l'acompte (RG01, RG02)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [student_id, school_id, fee_schedule_id, goal_type, plan_frequency]
+              properties:
+                student_id: { type: string, format: uuid }
+                school_id: { type: string, format: uuid }
+                fee_schedule_id: { type: string, format: uuid }
+                goal_type: { type: string, enum: [inscription, inscription_partielle, totalite] }
+                plan_frequency: { type: string, enum: [jour, semaine, mois] }
+      responses:
+        "201":
+          description: Caisse créée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  box: { $ref: "#/components/schemas/SavingsBox" }
+        "409": { description: "Caisse déjà active pour cet élève et cette année (RG15)" }
+    get:
+      summary: Liste des caisses visibles par l'utilisateur connecté
+      responses:
+        "200": { description: Liste des caisses }
+
+  /boxes/{id}:
+    get:
+      summary: Détail, solde, historique d'une caisse
+      parameters: [{ $ref: "#/components/parameters/idParam" }]
+      responses:
+        "200": { description: Détail de la caisse }
+        "404": { description: Caisse introuvable }
+
+  /boxes/{id}/payments:
+    post:
+      summary: Initie un versement
+      description: L'en-tête `Idempotency-Key` est obligatoire.
+      parameters: [{ $ref: "#/components/parameters/idParam" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount, operator, payer_phone]
+              properties:
+                amount: { type: integer, minimum: 500 }
+                operator: { type: string, enum: [moov_money, mtn_money, orange_money, wave, card] }
+                payer_phone: { type: string }
+      responses:
+        "202": { description: Versement initié, en attente de confirmation opérateur }
+        "409": { description: Objectif déjà atteint ou statut de caisse incompatible }
+
+  /boxes/{id}/statement:
+    get:
+      summary: Génère le relevé PDF horodaté avec QR de vérification (RG14)
+      parameters:
+        - { $ref: "#/components/parameters/idParam" }
+        - name: period_start
+          in: query
+          schema: { type: string, format: date }
+        - name: period_end
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: Fichier PDF
+          content:
+            application/pdf: {}
+
+  /boxes/{id}/contribution-links:
+    post:
+      summary: Crée un lien de contribution familiale (RG12)
+      parameters: [{ $ref: "#/components/parameters/idParam" }]
+      responses:
+        "201": { description: Lien créé }
+
+  /contribute:
+    post:
+      summary: Contribution externe via un code à 6 caractères (sans compte, ≤ 200 000 F CFA)
+      security: []
+      responses:
+        "202": { description: Contribution initiée }
+        "403": { description: "Montant > 200 000 F CFA : création de compte requise (RG12)" }
+
+  /webhooks/moov-money:
+    post:
+      summary: Confirmation de paiement Moov Money (signature vérifiée)
+      security: []
+      responses:
+        "200": { description: Traité }
+        "403": { description: Signature invalide }
+
+  /webhooks/aggregator:
+    post:
+      summary: Confirmation de paiement des autres canaux
+      security: []
+      responses:
+        "200": { description: Traité }
+
+  /schools/{id}/fees:
+    put:
+      summary: Met à jour la grille tarifaire (rôle admin établissement)
+      parameters: [{ $ref: "#/components/parameters/idParam" }]
+      responses:
+        "200": { description: Grille mise à jour }
+
+  /schools/{id}/dashboard:
+    get:
+      summary: Indicateurs agrégés de l'établissement (E4)
+      parameters: [{ $ref: "#/components/parameters/idParam" }]
+      responses:
+        "200": { description: Indicateurs }
+
+  /schools/{id}/payouts:
+    post:
+      summary: Demande de reversement (E6)
+      parameters: [{ $ref: "#/components/parameters/idParam" }]
+      responses:
+        "201": { description: Demande créée }
+    get:
+      summary: Suivi des demandes de reversement
+      parameters: [{ $ref: "#/components/parameters/idParam" }]
+      responses:
+        "200": { description: Liste des demandes }
+
+  /verify/{number}:
+    get:
+      summary: Vérifie l'authenticité d'un relevé via son numéro (QR code)
+      security: []
+      parameters:
+        - name: number
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Résultat de la vérification }
+
+  /admin/overview:
+    get:
+      summary: Vue globale du back-office (A1, super-admin/agent uniquement)
+      responses:
+        "200": { description: Indicateurs globaux }
+        "403": { description: Rôle non autorisé }
+
+  /admin/schools:
+    get:
+      summary: File de validation KYB des établissements (A2)
+      responses:
+        "200": { description: Liste des établissements }
+
+  /admin/transactions:
+    get:
+      summary: Journal complet des transactions (A4)
+      responses:
+        "200": { description: Liste des transactions }
+
+  /admin/transactions/{id}/reverse:
+    post:
+      summary: Contre-écriture motivée d'une transaction réussie (A6, RG13)
+      parameters: [{ $ref: "#/components/parameters/idParam" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 10 }
+      responses:
+        "201": { description: Contre-écriture créée }
+
+  /admin/reconciliation:
+    get:
+      summary: Écarts du rapprochement quotidien (A4, A8 — super-admin uniquement)
+      responses:
+        "200": { description: Rapport de rapprochement }

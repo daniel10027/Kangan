@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-fraunces: "Fraunces", Georgia, serif;
+  --font-jakarta: "Plus Jakarta Sans", system-ui, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-creme text-encre antialiased;
+  font-feature-settings: "tnum" 1; /* chiffres tabulaires pour les montants */
+}
+
+.dark body {
+  @apply bg-dark-creme text-dark-encre;
+}
+
+::selection {
+  background-color: theme("colors.ocre");
+  color: theme("colors.vert-kangan");
+}
+
+/* Motif tissé — filigrane discret utilisé sur les cartes et relevés (section 11) */
+.woven-pattern {
+  background-image: repeating-linear-gradient(
+      45deg,
+      currentColor 0,
+      currentColor 1px,
+      transparent 1px,
+      transparent 12px
+    ),
+    repeating-linear-gradient(-45deg, currentColor 0, currentColor 1px, transparent 1px, transparent 12px);
+  opacity: 0.06;
+}
+
+.focus-ring {
+  @apply outline-none ring-2 ring-ocre ring-offset-2 ring-offset-creme;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

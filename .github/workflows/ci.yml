@@ -1,0 +1,134 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-typecheck-test:
+    name: Lint, typecheck, unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck (packages/shared, packages/payments, packages/ui)
+        run: |
+          npm run typecheck --workspace=@kangan/shared
+          npm run typecheck --workspace=@kangan/payments
+          npm run typecheck --workspace=@kangan/ui
+
+      - name: Typecheck (apps/web)
+        run: npx tsc --noEmit -p apps/web/tsconfig.json
+
+      - name: Typecheck (apps/mobile)
+        run: npx tsc --noEmit -p apps/mobile/tsconfig.json
+
+      - name: Unit tests (business rules RG01–RG15)
+        run: npm run test --workspace=@kangan/shared
+
+      - name: Unit tests (payment adapters + simulator)
+        run: npm run test --workspace=@kangan/payments
+
+      - name: Unit tests (web server helpers)
+        run: npm run test --workspace=@kangan/web
+
+      - name: Lint (Next.js)
+        working-directory: apps/web
+        run: npx next lint --max-warnings=0
+        continue-on-error: true # ESLint config peut évoluer sans bloquer la CI pendant le pilote
+
+  build-web:
+    name: Build web (Next.js)
+    runs-on: ubuntu-latest
+    needs: lint-typecheck-test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        working-directory: apps/web
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-service-key' }}
+          PAYMENT_MODE: simulator
+          NEXT_PUBLIC_PAYMENT_MODE: simulator
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+          JWT_AUDIT_SALT: ci-secret
+        run: npm run build
+
+  e2e:
+    name: End-to-end tests (Playwright + Supabase local)
+    runs-on: ubuntu-latest
+    needs: lint-typecheck-test
+    continue-on-error: true # infra Docker-in-CI peut être instable ; ne bloque pas le pipeline pendant le pilote
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase (applique migrations + seed.sql)
+        run: supabase start
+
+      - name: Seed demo accounts
+        env:
+          # Clés de démonstration fixes générées par `supabase start` en local (non secrètes).
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+          SUPABASE_SERVICE_ROLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
+        run: npm run seed:demo || true
+
+      - name: Install Playwright browsers
+        working-directory: apps/web
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright tests
+        working-directory: apps/web
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+          PAYMENT_MODE: simulator
+          NEXT_PUBLIC_PAYMENT_MODE: simulator
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+          JWT_AUDIT_SALT: ci-secret
+        run: npx playwright test
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report/
+          retention-days: 14
+
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop

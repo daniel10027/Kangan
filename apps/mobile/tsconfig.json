@@ -1,0 +1,14 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@kangan/shared": ["../../packages/shared/src/index.ts"],
+      "@kangan/ui": ["../../packages/ui/src/index.ts"],
+      "@kangan/payments": ["../../packages/payments/src/index.ts"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx", "nativewind-env.d.ts"]
+}

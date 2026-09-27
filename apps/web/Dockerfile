@@ -18,7 +18,11 @@ COPY apps/mobile/package.json apps/mobile/package.json
 COPY packages/shared/package.json packages/shared/package.json
 COPY packages/ui/package.json packages/ui/package.json
 COPY packages/payments/package.json packages/payments/package.json
-RUN npm ci --workspace=@kangan/web --workspace=@kangan/shared --workspace=@kangan/ui --workspace=@kangan/payments --include-workspace-root
+# `npm ci` refuse parfois de "sauter" un optionalDependency dont la
+# plateforme ne correspond pas (ex. lightningcss-android-arm64, tiré par
+# apps/mobile) et échoue tout le build. `npm install` reste fidèle au
+# lockfile mais gère correctement ce cas — cf. section Docker de docs/DEPLOYMENT.md.
+RUN npm install --workspace=@kangan/web --workspace=@kangan/shared --workspace=@kangan/ui --workspace=@kangan/payments --include-workspace-root
 
 # --- Build ----------------------------------------------------------------
 FROM base AS build

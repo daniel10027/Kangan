@@ -13,6 +13,14 @@
 #
 # Le web est servi sur http://localhost:3000, Supabase Studio sur
 # http://localhost:54323, l'API Supabase sur http://localhost:54321.
+#
+# Important : DOCKER_SUPABASE_URL (ci-dessous) est volontairement une
+# variable distincte de NEXT_PUBLIC_SUPABASE_URL. Depuis l'intérieur d'un
+# conteneur, "127.0.0.1" désigne le conteneur lui-même, pas la machine hôte
+# où tourne `supabase start` — il faut "host.docker.internal". Si les deux
+# variables partageaient le même nom, la valeur "127.0.0.1" définie dans
+# .env pour les scripts locaux (seed:demo, npm run dev:web) écraserait le
+# défaut Docker et casserait la connexion au conteneur.
 # ---------------------------------------------------------------------------
 
 services:
@@ -21,14 +29,14 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
-        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-http://host.docker.internal:54321}
+        NEXT_PUBLIC_SUPABASE_URL: ${DOCKER_SUPABASE_URL:-http://host.docker.internal:54321}
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
         NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
         NEXT_PUBLIC_PAYMENT_MODE: ${PAYMENT_MODE:-simulator}
     ports:
       - "3000:3000"
     environment:
-      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-http://host.docker.internal:54321}
+      NEXT_PUBLIC_SUPABASE_URL: ${DOCKER_SUPABASE_URL:-http://host.docker.internal:54321}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
       PAYMENT_MODE: ${PAYMENT_MODE:-simulator}
@@ -46,7 +54,7 @@ services:
     image: node:20-slim
     working_dir: /repo
     command: >
-      sh -c "npm ci --workspace=@kangan/mobile && npx expo start --web --port 19006"
+      sh -c "npm install --workspace=@kangan/mobile && npx expo start --web --port 19006"
     volumes:
       - .:/repo
     ports:
@@ -55,9 +63,9 @@ services:
       - "19002:19002"
       - "19006:19006"
     environment:
-      EXPO_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-http://host.docker.internal:54321}
+      EXPO_PUBLIC_SUPABASE_URL: ${DOCKER_SUPABASE_URL:-http://host.docker.internal:54321}
       EXPO_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
-      EXPO_PUBLIC_API_URL: ${NEXT_PUBLIC_APP_URL:-http://host.docker.internal:3000}/api/v1
+      EXPO_PUBLIC_API_URL: http://host.docker.internal:3000/api/v1
       CI: "1"
     extra_hosts:
       - "host.docker.internal:host-gateway"

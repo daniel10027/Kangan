@@ -96,7 +96,21 @@ async function main() {
   const { data: fees } = await admin.from("fee_schedules").select("*");
   const feeFor = (schoolId: string, level: string) => fees!.find((f) => f.school_id === schoolId && f.level === level)!;
 
+  /**
+   * Idempotent : un ré-exécution de `npm run seed:demo` sur une base déjà
+   * seedée (cas courant en local) réutilise l'enfant existant au lieu
+   * d'échouer ou d'en créer un doublon.
+   */
   async function createStudent(parentId: string, firstName: string, lastName: string) {
+    const { data: existing } = await admin
+      .from("students")
+      .select("*")
+      .eq("parent_id", parentId)
+      .eq("first_name", firstName)
+      .eq("last_name", lastName)
+      .maybeSingle();
+    if (existing) return existing;
+
     const { data, error } = await admin
       .from("students")
       .insert({ parent_id: parentId, first_name: firstName, last_name: lastName })
@@ -106,6 +120,11 @@ async function main() {
     return data;
   }
 
+  /**
+   * Idempotent par référence de caisse (contrainte unique en base). Si la
+   * caisse existe déjà, on la retourne telle quelle sans rejouer les
+   * versements associés (évite de dupliquer les transactions).
+   */
   async function createBox(opts: {
     studentId: string;
     schoolId: string;
@@ -116,7 +135,10 @@ async function main() {
     deadline: string;
     status: "brouillon" | "en_attente" | "active" | "completee" | "reversee" | "suspendue";
     reference: string;
-  }) {
+  }): Promise<{ id: string; alreadyExisted: boolean }> {
+    const { data: existing } = await admin.from("savings_boxes").select("id").eq("reference", opts.reference).maybeSingle();
+    if (existing) return { id: existing.id, alreadyExisted: true };
+
     const { data, error } = await admin
       .from("savings_boxes")
       .insert({
@@ -136,7 +158,7 @@ async function main() {
       .select()
       .single();
     if (error) throw error;
-    return data;
+    return { id: data.id, alreadyExisted: false };
   }
 
   async function pay(boxId: string, amount: number, phone: string, type: "deposit" | "payment" = "payment") {
@@ -171,10 +193,12 @@ async function main() {
     status: "active",
     reference: "KG-2026-000001",
   });
-  await pay(box1.id, 60000, "+2250700000001", "deposit");
-  await pay(box1.id, 30000, "+2250700000001");
-  await pay(box1.id, 30000, "+2250700000001");
-  await pay(box1.id, 30000, "+2250700000001");
+  if (!box1.alreadyExisted) {
+    await pay(box1.id, 60000, "+2250700000001", "deposit");
+    await pay(box1.id, 30000, "+2250700000001");
+    await pay(box1.id, 30000, "+2250700000001");
+    await pay(box1.id, 30000, "+2250700000001");
+  }
 
   const ayaChild2 = await createStudent(ayaId, "Ama", "Kouassi");
   const box2 = await createBox({
@@ -188,8 +212,10 @@ async function main() {
     status: "completee",
     reference: "KG-2026-000002",
   });
-  await pay(box2.id, 11000, "+2250700000001", "deposit");
-  await pay(box2.id, 44000, "+2250700000001");
+  if (!box2.alreadyExisted) {
+    await pay(box2.id, 11000, "+2250700000001", "deposit");
+    await pay(box2.id, 44000, "+2250700000001");
+  }
 
   // Moussa : caisse en_attente (acompte non confirmé) + caisse brouillon
   const moussaChild = await createStudent(moussaId, "Ibrahim", "Diabaté");
@@ -231,8 +257,10 @@ async function main() {
     status: "active",
     reference: "KG-2026-000005",
   });
-  await pay(box5.id, 26800, "+2250700000003", "deposit");
-  await pay(box5.id, 15000, "+2250700000003");
+  if (!box5.alreadyExisted) {
+    await pay(box5.id, 26800, "+2250700000003", "deposit");
+    await pay(box5.id, 15000, "+2250700000003");
+  }
 
   console.log("\n✔ Données de démonstration créées.");
   console.log("\nComptes de test (OTP visible dans les logs Supabase en local) :");

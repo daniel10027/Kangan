@@ -43,6 +43,7 @@ l'exécution contre un vrai Postgres/Next.js les a révélés :
 2. **Récursion RLS infinie** entre `savings_boxes` et `students` (chacune interrogeait l'autre via une sous-requête directe non `SECURITY DEFINER`) — bloquait toute lecture de caisse. Corrigé en enveloppant la vérification école↔élève dans une fonction `SECURITY DEFINER` dédiée (`student_has_box_at_school`, migration `0004_rls_policies.sql`).
 3. **Plage de dates du relevé PDF excluait les transactions du jour même** (`.lte("created_at", "AAAA-MM-JJ")` comparé à minuit au lieu de fin de journée). Corrigé avec une borne haute exclusive au jour suivant.
 4. **Séparateur de milliers invisible dans les PDF** : `toLocaleString("fr-FR")` utilise une espace fine insécable (U+202F) que la police Helvetica ne rend pas ("300000" au lieu de "300 000"). Corrigé dans `packages/shared/src/format.ts`.
+5. **`scripts/seed-demo-data.ts` non idempotent** : un second `npm run seed:demo` sur une base déjà seedée échouait (`duplicate key ... savings_boxes_reference_key`). Corrigé : `createStudent`/`createBox` vérifient d'abord l'existence (par parent+nom, puis par référence) avant d'insérer, et les versements associés ne sont rejoués que pour une caisse nouvellement créée. Revérifié : trois exécutions consécutives laissent exactement 5 caisses, sans doublon.
 
 ## 2. Application Web (Next.js 15 / apps/web)
 
@@ -123,10 +124,18 @@ l'exécution contre un vrai Postgres/Next.js les a révélés :
 
 - [x] GitHub Actions (`ci.yml`) — lint, typecheck (4 packages + 2 apps), tests unitaires, build web, e2e (job tolérant aux pannes d'infra)
 - [x] `apps/web/vercel.json` + variables d'environnement documentées (`docs/DEPLOYMENT.md`)
-- [x] `docker-compose.yml` + `apps/web/Dockerfile` (build Next.js standalone) — lance web + bundler mobile (profil `mobile`) en une commande, backend via `supabase start`
+- [x] `docker-compose.yml` + `apps/web/Dockerfile` — lance web + bundler mobile (profil `mobile`) en une commande, backend via `supabase start`
+- [x] **`docker compose up --build` testé pour de vrai** : build réussi, conteneur démarré, appel réel `/api/v1/schools` depuis le conteneur vers Supabase sur l'hôte — voir bugs 6 et 7 ci-dessous
 - [x] Guide de déploiement pas à pas (`docs/DEPLOYMENT.md`) : local, Docker, Supabase hébergé, Vercel, EAS
 - [x] `apps/mobile/eas.json` — profils development/preview/production prêts
 - [ ] Build Android (EAS) réellement exécuté — nécessite un compte Expo/EAS (non disponible dans cet environnement)
+
+### Bugs Docker trouvés et corrigés (signalés par l'utilisateur en testant `docker compose up --build`)
+
+6. **`npm ci` échouait dans l'image web** (`npm error notsup ... Unsupported platform for lightningcss-android-arm64`) : ce paquet natif Android est tiré par `apps/mobile`/NativeWind, sans rapport avec l'image web, mais `npm ci` refuse de l'ignorer proprement en environnement Docker et fait échouer tout le build. Corrigé en utilisant `npm install` (plus tolérant sur ce point précis, tout en respectant le lockfile) dans `apps/web/Dockerfile` et dans le service `mobile` de `docker-compose.yml`.
+7. **Le conteneur web ne pouvait pas joindre Supabase si `.env` définissait `NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321`** (valeur correcte pour les scripts locaux, mais dans un conteneur `127.0.0.1` désigne le conteneur lui-même, pas l'hôte où tourne `supabase start`). Corrigé en découplant l'URL utilisée par Docker via une variable dédiée `DOCKER_SUPABASE_URL` (défaut `http://host.docker.internal:54321`), indépendante de `NEXT_PUBLIC_SUPABASE_URL`.
+
+Ces deux bugs ont été reproduits puis corrigés avec un vrai `docker build`/`docker compose up --build` (pas seulement relus) : build complet, conteneur démarré, requête HTTP réelle depuis le conteneur vers l'API Supabase de l'hôte, réponse JSON correcte reçue.
 
 ## 8. Documentation & dossier de candidature
 
